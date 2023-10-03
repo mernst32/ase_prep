@@ -55,22 +55,47 @@ def solution_two():
         return f"<p>New User: {user_id}</p>"
 
 
-@app.post("/stage/1/")
-def solve_one():
-    answers = []
-    planets = request.json["planets"]
-    questions = request.json["questions"]
+def populate_graph(planets):
     G = nx.DiGraph()
     for planet in planets:
         for portal in planet["portals"]:
             G.add_edge(planet["id"], portal["destinationId"], weight=portal["costs"])
+    return G
+
+
+def reachable(G, origin, destination):
+    return nx.has_path(G, origin, destination)
+
+
+@app.post("/stage/1/")
+def solve_one():
+    answers = []
+    planets = request.json["planets"]
+    G = populate_graph(planets)
+    questions = request.json["questions"]
     for question in questions:
         if question["type"] == "REACHABLE":
             answer = {"questionId": question["id"],
-                      "reachable": nx.has_path(G, question["originId"], question["destinationId"])}
+                      "reachable": reachable(G, question["originId"], question["destinationId"])
+                      }
             answers.append(answer)
+    return {"answers": answers}
 
-    return answers
+
+@app.post("/stage/2/")
+def solve_two():
+    answers = []
+    planets = request.json["planets"]
+    G = populate_graph(planets)
+    questions = request.json["questions"]
+    for question in questions:
+        if question["type"] == "REACHABLE":
+            answer = {"questionId": question["id"],
+                      "reachable": reachable(G, question["originId"], question["destinationId"])
+                      }
+            answers.append(answer)
+    all_reachable = (nx.edge_connectivity(G) > 0)
+    return {"answers": answers, "allReachable": all_reachable}
 
 
 if __name__ == '__main__':
