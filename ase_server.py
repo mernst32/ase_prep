@@ -135,5 +135,62 @@ def solve_three():
     return {"answers": answers, "allReachable": all_reachable}
 
 
+@app.post("/stage/4/")
+def solve_four():
+    answers = []
+    planets = request.json["planets"]
+    G = populate_graph(planets)
+    questions = request.json["questions"]
+    for question in questions:
+        if question["type"] == "REACHABLE":
+            answer = {"questionId": question["id"],
+                      "reachable": reachable(G, question["originId"], question["destinationId"])
+                      }
+            answers.append(answer)
+        if question["type"] == "CHEAPEST":
+            answer = {"questionId": question["id"]}
+            jumps = []
+            if reachable(G, question["originId"], question["destinationId"]):
+                stops = nx.shortest_path(G, source=question["originId"], target=question["destinationId"],
+                                         weight="weight")
+                for i in range(len(stops)-1):
+                    origin = stops[i]
+                    dest = stops[i+1]
+                    jump = {
+                        "portal": G.get_edge_data(origin, dest)['portal_id'],
+                        "originPlanet": origin,
+                        "destinationPlanet": dest
+                    }
+                    jumps.append(jump)
+                answer["costs"] = nx.shortest_path_length(G, source=question["originId"],
+                                                          target=question["destinationId"], weight="weight")
+            else:
+                answer["costs"] = -1
+            answer["jumps"] = jumps
+            answers.append(answer)
+    all_reachable = (nx.edge_connectivity(G) > 0)
+    max = 0
+    max_path = []
+    for node in G.nodes():
+        length, path = nx.single_source_bellman_ford(G, node, weight="weight")
+        for node in length.keys():
+            if max < length[node]:
+                max = length[node]
+                max_path = path[node]
+    origin = max_path[0]
+    dest = max_path[-1]
+    costs = max
+    jumps = []
+    for i in range(len(max_path) - 1):
+        jump = {
+            "portal": G.get_edge_data(max_path[i], max_path[i + 1])['portal_id'],
+            "originPlanet": max_path[i],
+            "destinationPlanet":  max_path[i + 1]
+        }
+        jumps.append(jump)
+    most_expensive = {"originId": origin, "destinationId": dest, "jumps": jumps, "costs": costs}
+    return {"answers": answers, "allReachable": all_reachable, "mostExpensive": most_expensive}
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=8001)
