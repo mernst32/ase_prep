@@ -1,6 +1,7 @@
 from flask import Flask
 from flask import request
 import psycopg2
+import networkx as nx
 
 app = Flask(__name__)
 
@@ -52,6 +53,24 @@ def solution_two():
         cur.close()
         conn.close()
         return f"<p>New User: {user_id}</p>"
+
+
+@app.post("/stage/1/")
+def solve_one():
+    answers = []
+    planets = request.json["planets"]
+    questions = request.json["questions"]
+    G = nx.DiGraph()
+    for planet in planets:
+        for portal in planet["portals"]:
+            G.add_edge(planet["id"], portal["destinationId"], weight=portal["costs"])
+    for question in questions:
+        if question["type"] == "REACHABLE":
+            answer = {"questionId": question["id"],
+                      "reachable": nx.has_path(G, question["originId"], question["destinationId"])}
+            answers.append(answer)
+
+    return answers
 
 
 if __name__ == '__main__':
