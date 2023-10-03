@@ -59,7 +59,7 @@ def populate_graph(planets):
     G = nx.DiGraph()
     for planet in planets:
         for portal in planet["portals"]:
-            G.add_edge(planet["id"], portal["destinationId"], weight=portal["costs"])
+            G.add_edge(planet["id"], portal["destinationId"], weight=portal["costs"], portal_id=portal["id"])
     return G
 
 
@@ -93,6 +93,43 @@ def solve_two():
             answer = {"questionId": question["id"],
                       "reachable": reachable(G, question["originId"], question["destinationId"])
                       }
+            answers.append(answer)
+    all_reachable = (nx.edge_connectivity(G) > 0)
+    return {"answers": answers, "allReachable": all_reachable}
+
+
+@app.post("/stage/3/")
+def solve_three():
+    answers = []
+    planets = request.json["planets"]
+    G = populate_graph(planets)
+    questions = request.json["questions"]
+    for question in questions:
+        if question["type"] == "REACHABLE":
+            answer = {"questionId": question["id"],
+                      "reachable": reachable(G, question["originId"], question["destinationId"])
+                      }
+            answers.append(answer)
+        if question["type"] == "CHEAPEST":
+            answer = {"questionId": question["id"]}
+            jumps = []
+            if reachable(G, question["originId"], question["destinationId"]):
+                stops = nx.shortest_path(G, source=question["originId"], target=question["destinationId"],
+                                         weight="weight")
+                for i in range(len(stops)-1):
+                    origin = stops[i]
+                    dest = stops[i+1]
+                    jump = {
+                        "portal": G.get_edge_data(origin, dest)['portal_id'],
+                        "originPlanet": origin,
+                        "destinationPlanet": dest
+                    }
+                    jumps.append(jump)
+                answer["costs"] = nx.shortest_path_length(G, source=question["originId"],
+                                                          target=question["destinationId"], weight="weight")
+            else:
+                answer["costs"] = -1
+            answer["jumps"] = jumps
             answers.append(answer)
     all_reachable = (nx.edge_connectivity(G) > 0)
     return {"answers": answers, "allReachable": all_reachable}
